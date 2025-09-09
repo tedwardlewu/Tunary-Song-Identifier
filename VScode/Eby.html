@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<link rel="stylesheet" href="Eby.css">
+
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunary</title>
+    <link rel="icon" type="image/png" href="Tunary.png">
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>🎵Song Identifier🎵</h1>
+        <button id="recordBtn">Start Recording</button>
+        <audio id="audioPlayback" controls style="display:none;"></audio>
+        <progress id="recordProgress" value="0" max="100" style="width:100%; display:none;"></progress>
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        const recordBtn = document.getElementById('recordBtn');
+        const audioPlayback = document.getElementById('audioPlayback');
+        const resultDiv = document.getElementById('result');
+        const recordProgress = document.getElementById('recordProgress');
+        let isRecording = false;
+        let progressInterval;
+        const MAX_RECORD_TIME = 10; //to conserve resources max is 10 seconds
+
+        recordBtn.onclick = async function() {
+            if (!isRecording) {
+                //recording starts here
+                audioChunks = [];
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.textContent = "Stop Recording";
+                resultDiv.textContent = "";
+                audioPlayback.style.display = "none";
+                recordProgress.style.display = "block";
+                recordProgress.value = 0;
+
+                let startTime = Date.now();
+                progressInterval = setInterval(() => {
+                    let elapsed = (Date.now() - startTime) / 1000;
+                    let percent = Math.min((elapsed / MAX_RECORD_TIME) * 100, 100);
+                    recordProgress.value = percent;
+                    if (elapsed >= MAX_RECORD_TIME) {
+                        stopRecording();
+                    }
+                }, 50);
+
+                mediaRecorder.ondataavailable = e => {
+                    audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    clearInterval(progressInterval);
+                    recordProgress.style.display = "none";
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayback.src = audioUrl;
+                    audioPlayback.style.display = "block";
+                    resultDiv.textContent = "Identifying song...";
+
+                    
+                    const apiKey = "59de6bd5b14b07a23178ff5ee378f59a";
+                    //API audi key from AudD
+
+                    const formData = new FormData();
+                    formData.append('file', audioBlob, 'recording.wav');
+                    formData.append('api_token', apiKey);
+                    formData.append('return', 'apple_music,spotify'); //Request more info
+
+                    try {
+                        const response = await fetch('https://api.audd.io/', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+
+                        if (data && data.result) {
+                            resultDiv.innerHTML = formatSongInfo(data.result);
+                        } 
+                        
+                        else {
+                            resultDiv.textContent = "Song not found. Try again.";
+                        }
+
+                    } catch (error) {
+                        resultDiv.textContent = "Error identifying song.";
+                    }
+                };
+
+                
+                setTimeout(() => {
+
+                    if (isRecording) stopRecording();
+                }, MAX_RECORD_TIME * 1000);
+
+                function stopRecording() {
+
+                    if (isRecording) {
+                        mediaRecorder.stop();
+                        isRecording = false;
+                        recordBtn.textContent = "Start Recording";
+                    }
+                }
+            } else {
+            
+                clearInterval(progressInterval);
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.textContent = "Start Recording";
+                recordProgress.style.display = "none";
+            }
+        };
+
+        //displays information about the song 
+        function formatSongInfo(song) {
+            let html = `Song: <b>${song.title}</b><br>Artist: <b>${song.artist}</b>`;
+
+            if (song.album) html += `<br>Album: <b>${song.album}</b>`;
+           
+            if (song.release_date) html += `<br>Release Date: <b>${song.release_date}</b>`;
+           
+            if (song.spotify && song.spotify.external_urls && song.spotify.external_urls.spotify) {
+                html += `<br><a href="${song.spotify.external_urls.spotify}" target="_blank">Listen on Spotify</a>`;
+            }
+            
+            if (song.apple_music && song.apple_music.url) {
+                html += `<br><a href="${song.apple_music.url}" target="_blank">Listen on Apple Music</a>`;
+            }
+            return html;
+        }
+    </script>
+</body>
