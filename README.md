@@ -1,4 +1,4 @@
-This is a side project between Edward (Haoming) Wu and Justin Fang. This project focuses on the front-end application, audio recording/handling, and the logic to communicate with the AudD API to display results. A static front-end application that demonstrates the integration of a third-party audio recognition API to identify music from recorded samples, displaying relevant information. 
+A static front-end application that demonstrates the integration of a third-party audio recognition API to identify music from recorded samples, displaying relevant information. 
 
 ## API Credit
 
